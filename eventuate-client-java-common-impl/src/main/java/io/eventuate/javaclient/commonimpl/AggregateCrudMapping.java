@@ -11,6 +11,7 @@ import io.eventuate.UpdateOptions;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -53,22 +54,32 @@ public class AggregateCrudMapping {
   }
 
   public static EventTypeAndData toEventTypeAndData(Event event, Optional<String> metadata) {
-    return new EventTypeAndData(event.getClass().getName(), JSonMapper.toJson(event), metadata);
+    return toEventTypeAndData(event, metadata, Function.identity());
+  }
+
+  public static EventTypeAndData toEventTypeAndData(Event event, Optional<String> metadata, Function<String, String> jsonHandler) {
+    return new EventTypeAndData(event.getClass().getName(), jsonHandler.apply(JSonMapper.toJson(event)), metadata);
   }
 
   public static Event toEvent(EventIdTypeAndData eventIdTypeAndData) {
+    return toEvent(eventIdTypeAndData, Function.identity());
+  }
+
+  public static Event toEvent(EventIdTypeAndData eventIdTypeAndData, Function<String, String> jsonHandler) {
     try {
-      return JSonMapper.fromJson(eventIdTypeAndData.getEventData(), (Class<Event>) Class.forName(eventIdTypeAndData.getEventType()));
+      return JSonMapper.fromJson(jsonHandler.apply(eventIdTypeAndData.getEventData()), (Class<Event>) Class.forName(eventIdTypeAndData.getEventType()));
     } catch (ClassNotFoundException e) {
       throw new RuntimeException(e);
     }
   }
 
   public static EventWithMetadata toEventWithMetadata(EventIdTypeAndData eventIdTypeAndData) {
-    Optional<String> metadata = eventIdTypeAndData.getMetadata();
-    return new EventWithMetadata(toEvent(eventIdTypeAndData), eventIdTypeAndData.getId(),
-            metadata == null ? Optional.empty() : metadata.map(md -> JSonMapper.fromJson(md, Map.class)));
+    return toEventWithMetadata(eventIdTypeAndData, Function.identity());
   }
 
-
+  public static EventWithMetadata toEventWithMetadata(EventIdTypeAndData eventIdTypeAndData, Function<String, String> jsonHandler) {
+    Optional<String> metadata = eventIdTypeAndData.getMetadata();
+    return new EventWithMetadata(toEvent(eventIdTypeAndData, jsonHandler), eventIdTypeAndData.getId(),
+            metadata == null ? Optional.empty() : metadata.map(md -> JSonMapper.fromJson(md, Map.class)));
+  }
 }

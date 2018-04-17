@@ -1,10 +1,13 @@
-package io.eventuate.javaclient.commonimpl.encryption;
+package io.eventuate.encryption;
 
-import io.eventuate.javaclient.commonimpl.JSonMapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
 
 public class EncryptedEventData {
   public static String ENCRYPTED_EVENT_DATA_STRING_PREFIX = "__ENCRYPTED__";
 
+  private static final ObjectMapper objectMapper = new ObjectMapper();
   private String encryptionKeyId;
   private String data;
 
@@ -16,13 +19,18 @@ public class EncryptedEventData {
     this.data = data;
   }
 
-  public static boolean checkIfEventDataStringIsEncrypted(String eventData) {
+  public static boolean isEventDataStringEncrypted(String eventData) {
     return eventData.startsWith(ENCRYPTED_EVENT_DATA_STRING_PREFIX);
   }
 
   public static EncryptedEventData fromEventDataString(String eventData) {
     String json = eventData.substring(ENCRYPTED_EVENT_DATA_STRING_PREFIX.length());
-    return JSonMapper.fromJson(json, EncryptedEventData.class);
+
+    try {
+      return objectMapper.readValue(json, EncryptedEventData.class);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   public String getEncryptionKeyId() {
@@ -42,6 +50,10 @@ public class EncryptedEventData {
   }
 
   public String asString() {
-    return ENCRYPTED_EVENT_DATA_STRING_PREFIX + JSonMapper.toJson(this);
+    try {
+      return ENCRYPTED_EVENT_DATA_STRING_PREFIX + objectMapper.writeValueAsString(this);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

@@ -1,4 +1,4 @@
-package io.eventuate.javaclient.commonimpl.encryption;
+package io.eventuate.encryption;
 
 public class EncryptionKey {
   private String id;

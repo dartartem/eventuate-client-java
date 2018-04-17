@@ -16,7 +16,9 @@ import io.eventuate.Snapshot;
 import io.eventuate.SnapshotManager;
 import io.eventuate.SubscriberOptions;
 import io.eventuate.UpdateOptions;
+import io.eventuate.encryption.EncryptedEventData;
 import io.eventuate.javaclient.commonimpl.*;
+import io.eventuate.encryption.EventDataEncryptor;
 import io.eventuate.sync.EventuateAggregateStore;
 
 import java.util.List;
@@ -37,6 +39,7 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
   private SnapshotManager snapshotManager;
   private SerializedEventDeserializer serializedEventDeserializer = new DefaultSerializedEventDeserializer();
   private MissingApplyEventMethodStrategy missingApplyEventMethodStrategy;
+  private EventDataEncryptor eventDataEncryptor = new EventDataEncryptor();
 
   public EventuateAggregateStoreImpl(AggregateCrud aggregateCrud, AggregateEvents aggregateEvents, SnapshotManager snapshotManager, MissingApplyEventMethodStrategy missingApplyEventMethodStrategy) {
     this.aggregateCrud = aggregateCrud;
@@ -62,7 +65,16 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
   @Override
   public <T extends Aggregate<T>> EntityIdAndVersion save(Class<T> clasz, List<Event> events, Optional<SaveOptions> saveOptions) {
     Optional<String> serializedMetadata = saveOptions.flatMap(SaveOptions::getEventMetadata).map(JSonMapper::toJson);
-    List<EventTypeAndData> serializedEvents = events.stream().map(event -> toEventTypeAndData(event, serializedMetadata)).collect(Collectors.toList());
+    List<EventTypeAndData> serializedEvents = events
+            .stream()
+            .map(event ->
+                    toEventTypeAndData(event,
+                            serializedMetadata,
+                            json -> saveOptions
+                                    .flatMap(SaveOptions::getEncryptionKey)
+                                    .map(k -> new EncryptedEventData(k.getId(), eventDataEncryptor.encrypt(k, json)).asString())
+                                    .orElse(json)))
+            .collect(Collectors.toList());
     try {
       EntityIdVersionAndEventIds result = aggregateCrud.save(clasz.getName(), serializedEvents, toAggregateCrudSaveOptions(saveOptions));
       if (activityLogger.isDebugEnabled())
@@ -91,7 +103,15 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
       LoadedEvents le = aggregateCrud.find(clasz.getName(), entityId, toAggregateCrudFindOptions(findOptions));
       if (activityLogger.isDebugEnabled())
         activityLogger.debug("Loaded entity: {} {} {}", clasz.getName(), entityId, le.getEvents());
-      List<EventWithMetadata> eventsWithIds = le.getEvents().stream().map(AggregateCrudMapping::toEventWithMetadata).collect(Collectors.toList());
+      List<EventWithMetadata> eventsWithIds = le
+              .getEvents()
+              .stream()
+              .map(event ->
+                      AggregateCrudMapping.toEventWithMetadata(event, json -> findOptions
+                              .flatMap(FindOptions::getEncryptionKey)
+                              .map(k -> eventDataEncryptor.decrypt(k, json))
+                              .orElse(json)))
+              .collect(Collectors.toList());
       List<Event> events = eventsWithIds.stream().map(EventWithMetadata::getEvent).collect(Collectors.toList());
       return new EntityWithMetadata<T>(
               new EntityIdAndVersion(entityId,
@@ -123,7 +143,16 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
   public <T extends Aggregate<T>> EntityIdAndVersion update(Class<T> clasz, EntityIdAndVersion entityIdAndVersion, List<Event> events, Optional<UpdateOptions> updateOptions) {
     try {
       Optional<String> serializedEventMetadata = updateOptions.flatMap(UpdateOptions::getEventMetadata).map(JSonMapper::toJson);
-      List<EventTypeAndData> serializedEvents = events.stream().map(event -> toEventTypeAndData(event, serializedEventMetadata)).collect(Collectors.toList());
+      List<EventTypeAndData> serializedEvents = events
+              .stream()
+              .map(event ->
+                      toEventTypeAndData(event,
+                              serializedEventMetadata,
+                              json -> updateOptions
+                                      .flatMap(UpdateOptions::getEncryptionKey)
+                                      .map(k -> new EncryptedEventData(k.getId(), eventDataEncryptor.encrypt(k, json)).asString())
+                                      .orElse(json)))
+              .collect(Collectors.toList());
       EntityIdVersionAndEventIds result = aggregateCrud.update(new EntityIdAndType(entityIdAndVersion.getEntityId(), clasz.getName()),
               entityIdAndVersion.getEntityVersion(),
               serializedEvents,
@@ -164,6 +193,4 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
   public Aggregate recreateFromSnapshot(Class<?> clasz, Snapshot snapshot) {
     return snapshotManager.recreateFromSnapshot(clasz, snapshot, missingApplyEventMethodStrategy);
   }
-
-
 }

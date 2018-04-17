@@ -3,6 +3,9 @@ apply plugin: PublicModulePlugin
 dependencies {
     compile "commons-lang:commons-lang:2.6"
     compile "org.slf4j:slf4j-api:1.7.18"
+    compile "org.springframework.security:spring-security-core:5.0.4.RELEASE"
+    compile "com.fasterxml.jackson.core:jackson-databind:2.8.8"
+    compile "com.fasterxml.jackson.datatype:jackson-datatype-jdk8:2.8.8"
 
     testCompile project(":eventuate-client-java-tests-example-domain")
     testCompile 'org.mockito:mockito-all:1.10.19'

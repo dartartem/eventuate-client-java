@@ -17,10 +17,6 @@ import io.eventuate.javaclient.commonimpl.EventTypeAndData;
 import io.eventuate.javaclient.commonimpl.LoadedEvents;
 import io.eventuate.javaclient.commonimpl.SerializedSnapshot;
 import io.eventuate.javaclient.commonimpl.SerializedSnapshotWithVersion;
-import io.eventuate.javaclient.commonimpl.encryption.EncryptedEventData;
-import io.eventuate.javaclient.commonimpl.encryption.EncryptionKey;
-import io.eventuate.javaclient.commonimpl.encryption.EncryptionKeyStore;
-import io.eventuate.javaclient.commonimpl.encryption.EventDataEncryptor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
@@ -75,7 +71,7 @@ public class EventuateJdbcAccessImpl implements EventuateJdbcAccess {
       jdbcTemplate.update(String.format("INSERT INTO %s (event_id, event_type, event_data, entity_type, entity_id, triggering_event, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)", eventTable),
               event.getId().asString(),
               event.getEventType(),
-              encryptEventDataIfNeeded(event.getEventData(), saveOptions.flatMap(AggregateCrudSaveOptions::getEncryptionKey)),
+              event.getEventData(),
               aggregateType,
               entityId,
               saveOptions.flatMap(AggregateCrudSaveOptions::getTriggeringEvent).map(EventContext::getEventToken).orElse(null),
@@ -143,9 +139,6 @@ public class EventuateJdbcAccessImpl implements EventuateJdbcAccess {
               eventAndTriggerRowMapper, aggregateType, entityId
       );
     }
-
-    events.forEach(eventAndTrigger ->
-            eventAndTrigger.event.setEventData(decryptEventDataIfNeeded(eventAndTrigger.event.getEventData(), findOptions.flatMap(AggregateCrudFindOptions::getEncryptionKeyStore))));
 
     logger.debug("Loaded {} events", events);
     Optional<EventAndTrigger> matching = findOptions.
@@ -236,7 +229,7 @@ public class EventuateJdbcAccessImpl implements EventuateJdbcAccess {
       jdbcTemplate.update(String.format("INSERT INTO %s (event_id, event_type, event_data, entity_type, entity_id, triggering_event, metadata) VALUES (?, ?, ?, ?, ?, ?, ?)", eventTable),
               event.getId().asString(),
               event.getEventType(),
-              encryptEventDataIfNeeded(event.getEventData(), updateOptions.flatMap(AggregateCrudUpdateOptions::getEncryptionKey)),
+              event.getEventData(),
               entityType,
               entityId,
               updateOptions.flatMap(AggregateCrudUpdateOptions::getTriggeringEvent).map(EventContext::getEventToken).orElse(null),
@@ -258,27 +251,5 @@ public class EventuateJdbcAccessImpl implements EventuateJdbcAccess {
   protected String snapshotTriggeringEvents(Optional<LoadedSnapshot> previousSnapshot, List<EventAndTrigger> events, Optional<EventContext> eventContext) {
     // do nothing
     return null;
-  }
-
-  private String encryptEventDataIfNeeded(String eventData, Optional<EncryptionKey> encryptionKey) {
-    return encryptionKey
-            .map(key -> new EncryptedEventData(key.getId(), EventDataEncryptor.encrypt(key, eventData)).asString())
-            .orElse(eventData);
-  }
-
-  private String decryptEventDataIfNeeded(String eventData, Optional<EncryptionKeyStore> encryptionKeyStore) {
-    if (EncryptedEventData.checkIfEventDataStringIsEncrypted(eventData)) {
-      EncryptedEventData encryptedEventData = EncryptedEventData.fromEventDataString(eventData);
-      String data = encryptedEventData.getData();
-      String keyId = encryptedEventData.getEncryptionKeyId();
-
-      EncryptionKey key = encryptionKeyStore
-              .map(store -> store.findEncryptionKeyById(keyId))
-              .orElseThrow(() -> new IllegalArgumentException("EncryptionKeyStore is not specified"));
-
-      return EventDataEncryptor.decrypt(key, data);
-    }
-
-    return eventData;
   }
 }
