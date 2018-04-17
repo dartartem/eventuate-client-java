@@ -124,7 +124,7 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
               .map(event ->
                       AggregateCrudMapping.toEventWithMetadata(event, json -> findOptions
                               .flatMap(FindOptions::getEncryptionKey)
-                              .map(k -> eventDataEncryptor.decrypt(k, json))
+                              .map(k -> EncryptedEventData.isEventDataStringEncrypted(json) ? eventDataEncryptor.decrypt(k, json) : json)
                               .orElse(json)))
               .collect(Collectors.toList());
 
