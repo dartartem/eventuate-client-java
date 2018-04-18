@@ -80,6 +80,10 @@ public class UpdateOptions {
     return new UpdateOptions(Optional.ofNullable(eventContext), this.eventMetadata, this.snapshot, this.interceptor);
   }
 
+  public UpdateOptions withEncryptionKey(EncryptionKey encryptionKey) {
+    return new UpdateOptions(this.triggeringEvent, this.eventMetadata, this.snapshot, this.interceptor, Optional.of(encryptionKey));
+  }
+
   public UpdateOptions withEventMetadata(Map<String, String> eventMetadata) {
     return new UpdateOptions(this.triggeringEvent, Optional.of(eventMetadata), this.snapshot, this.interceptor);
   }

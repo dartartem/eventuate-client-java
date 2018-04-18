@@ -3,6 +3,7 @@ package io.eventuate.javaclient.commonimpl;
 import io.eventuate.*;
 import io.eventuate.encryption.EncryptedEventData;
 import io.eventuate.encryption.EventDataEncryptor;
+import io.eventuate.encryption.NoEncryptionKeyProvidedException;
 import io.eventuate.javaclient.commonimpl.schemametadata.EmptyEventSchemaMetadataManager;
 import io.eventuate.javaclient.commonimpl.schemametadata.EventSchemaMetadataManager;
 
@@ -124,8 +125,15 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
               .map(event ->
                       AggregateCrudMapping.toEventWithMetadata(event, json -> findOptions
                               .flatMap(FindOptions::getEncryptionKey)
-                              .map(k -> EncryptedEventData.isEventDataStringEncrypted(json) ? eventDataEncryptor.decrypt(k, json) : json)
-                              .orElse(json)))
+                              .map(k -> EncryptedEventData.isEventDataStringEncrypted(json) ?
+                                      eventDataEncryptor.decrypt(k, EncryptedEventData.fromEventDataString(json).getData()) :
+                                      json)
+                              .orElseGet(() -> {
+                                if (EncryptedEventData.isEventDataStringEncrypted(json)) {
+                                  throw new NoEncryptionKeyProvidedException(EncryptedEventData.fromEventDataString(json));
+                                }
+                                return json;
+                              })))
               .collect(Collectors.toList());
 
       List<Event> events = eventsWithIds.stream().map(EventWithMetadata::getEvent).collect(Collectors.toList());

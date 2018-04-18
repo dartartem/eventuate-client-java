@@ -17,6 +17,7 @@ import io.eventuate.SnapshotManager;
 import io.eventuate.SubscriberOptions;
 import io.eventuate.UpdateOptions;
 import io.eventuate.encryption.EncryptedEventData;
+import io.eventuate.encryption.NoEncryptionKeyProvidedException;
 import io.eventuate.javaclient.commonimpl.*;
 import io.eventuate.encryption.EventDataEncryptor;
 import io.eventuate.sync.EventuateAggregateStore;
@@ -107,10 +108,18 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
               .getEvents()
               .stream()
               .map(event ->
-                      AggregateCrudMapping.toEventWithMetadata(event, json -> findOptions
-                              .flatMap(FindOptions::getEncryptionKey)
-                              .map(k -> EncryptedEventData.isEventDataStringEncrypted(json) ? eventDataEncryptor.decrypt(k, json) : json)
-                              .orElse(json)))
+                      AggregateCrudMapping.toEventWithMetadata(event, json ->
+                              findOptions
+                                      .flatMap(FindOptions::getEncryptionKey)
+                                      .map(k -> EncryptedEventData.isEventDataStringEncrypted(json) ?
+                                              eventDataEncryptor.decrypt(k, EncryptedEventData.fromEventDataString(json).getData()) :
+                                              json)
+                                      .orElseGet(() -> {
+                                        if (EncryptedEventData.isEventDataStringEncrypted(json)) {
+                                          throw new NoEncryptionKeyProvidedException(EncryptedEventData.fromEventDataString(json));
+                                        }
+                                        return json;
+                                      })))
               .collect(Collectors.toList());
       List<Event> events = eventsWithIds.stream().map(EventWithMetadata::getEvent).collect(Collectors.toList());
       return new EntityWithMetadata<T>(
