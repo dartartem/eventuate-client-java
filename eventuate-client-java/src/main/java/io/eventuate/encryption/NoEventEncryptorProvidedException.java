@@ -1,9 +1,9 @@
 package io.eventuate.encryption;
 
-public class NoEncryptionKeyProvidedException extends RuntimeException {
+public class NoEventEncryptorProvidedException extends RuntimeException {
   private EncryptedEventData encryptedEventData;
 
-  public NoEncryptionKeyProvidedException(EncryptedEventData encryptedEventData) {
+  public NoEventEncryptorProvidedException(EncryptedEventData encryptedEventData) {
     this.encryptedEventData = encryptedEventData;
   }
 

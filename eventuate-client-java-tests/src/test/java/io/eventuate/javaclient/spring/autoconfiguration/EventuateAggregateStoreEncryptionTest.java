@@ -1,7 +1,8 @@
 package io.eventuate.javaclient.spring.autoconfiguration;
 
 import io.eventuate.*;
-import io.eventuate.encryption.NoEncryptionKeyProvidedException;
+import io.eventuate.encryption.EventEncryptor;
+import io.eventuate.encryption.NoEventEncryptorProvidedException;
 import io.eventuate.javaclient.saasclient.EventuateAggregateStoreBuilder;
 import org.junit.Assert;
 import org.junit.runner.RunWith;
@@ -24,7 +25,7 @@ public class EventuateAggregateStoreEncryptionTest extends AbstractEventuateAggr
   protected EntityIdAndVersion save(String data) throws Exception {
     return aggregateStore.save(SomeAggregate.class,
             Collections.singletonList(new SomeEvent(data)),
-            new SaveOptions().withEncryptionKey(encryptionKey)).get();
+            new SaveOptions().withEncryptionKeyId(keyId)).get();
   }
 
   @Override
@@ -32,19 +33,22 @@ public class EventuateAggregateStoreEncryptionTest extends AbstractEventuateAggr
     return aggregateStore.update(SomeAggregate.class,
             entityIdAndVersion,
             Collections.singletonList(new SomeEvent(data)),
-            new UpdateOptions().withEncryptionKey(encryptionKey)).get();
+            new UpdateOptions().withEncryptionKeyId(keyId)).get();
   }
 
   @Override
-  protected EntityWithMetadata<SomeAggregate> find(EntityIdAndVersion entityIdAndVersion,
-                                                   boolean encrypted) throws Exception {
+  protected EntityWithMetadata<SomeAggregate> find(EntityIdAndVersion entityIdAndVersion) throws Exception {
     try {
       return aggregateStore.find(SomeAggregate.class,
-              entityIdAndVersion.getEntityId(),
-              encrypted ? Optional.of(new FindOptions().withEncryptionKey(encryptionKey)) : Optional.empty()).get();
+              entityIdAndVersion.getEntityId()).get();
     } catch (ExecutionException e) {
-      Assert.assertTrue(e.getCause() instanceof NoEncryptionKeyProvidedException);
-      throw (NoEncryptionKeyProvidedException) e.getCause();
+      Assert.assertTrue(e.getCause() instanceof NoEventEncryptorProvidedException);
+      throw (NoEventEncryptorProvidedException) e.getCause();
     }
+  }
+
+  @Override
+  protected void setEventEncryptor(Optional<EventEncryptor> eventEncryptor) {
+    aggregateStore.setEventEncryptor(eventEncryptor);
   }
 }

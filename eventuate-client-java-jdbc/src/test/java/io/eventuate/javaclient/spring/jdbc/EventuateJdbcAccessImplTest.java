@@ -2,8 +2,6 @@ package io.eventuate.javaclient.spring.jdbc;
 
 import io.eventuate.EntityIdAndType;
 import io.eventuate.javaclient.commonimpl.*;
-import io.eventuate.encryption.EncryptedEventData;
-import io.eventuate.encryption.EncryptionKey;
 import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.beans.factory.annotation.Autowired;

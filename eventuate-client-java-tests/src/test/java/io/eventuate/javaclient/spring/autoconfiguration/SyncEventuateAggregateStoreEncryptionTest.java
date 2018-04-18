@@ -1,6 +1,7 @@
 package io.eventuate.javaclient.spring.autoconfiguration;
 
 import io.eventuate.*;
+import io.eventuate.encryption.EventEncryptor;
 import io.eventuate.javaclient.saasclient.EventuateAggregateStoreBuilder;
 import io.eventuate.sync.EventuateAggregateStore;
 import org.junit.runner.RunWith;
@@ -22,7 +23,7 @@ public class SyncEventuateAggregateStoreEncryptionTest extends AbstractEventuate
   protected EntityIdAndVersion save(String data) {
     return aggregateStore.save(SomeAggregate.class,
             Collections.singletonList(new SomeEvent(data)),
-            new SaveOptions().withEncryptionKey(encryptionKey));
+            new SaveOptions().withEncryptionKeyId(keyId));
   }
 
   @Override
@@ -30,13 +31,17 @@ public class SyncEventuateAggregateStoreEncryptionTest extends AbstractEventuate
     return aggregateStore.update(SomeAggregate.class,
             entityIdAndVersion,
             Collections.singletonList(new SomeEvent(data)),
-            new UpdateOptions().withEncryptionKey(encryptionKey));
+            new UpdateOptions().withEncryptionKeyId(keyId));
   }
 
   @Override
-  protected EntityWithMetadata<SomeAggregate> find(EntityIdAndVersion entityIdAndVersion, boolean encrypted) {
+  protected EntityWithMetadata<SomeAggregate> find(EntityIdAndVersion entityIdAndVersion) {
     return aggregateStore.find(SomeAggregate.class,
-            entityIdAndVersion.getEntityId(),
-            encrypted ? Optional.of(new FindOptions().withEncryptionKey(encryptionKey)) : Optional.empty());
+            entityIdAndVersion.getEntityId());
+  }
+
+  @Override
+  protected void setEventEncryptor(Optional<EventEncryptor> eventEncryptor) {
+    aggregateStore.setEventEncryptor(eventEncryptor);
   }
 }

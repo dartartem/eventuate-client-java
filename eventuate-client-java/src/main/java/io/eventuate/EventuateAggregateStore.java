@@ -1,5 +1,7 @@
 package io.eventuate;
 
+import io.eventuate.encryption.EventEncryptor;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +35,13 @@ public interface EventuateAggregateStore {
   <T extends Aggregate<T>> CompletableFuture<EntityIdAndVersion> update(Class<T> clasz, EntityIdAndVersion entityIdAndVersion, List<Event> events, Optional<UpdateOptions> updateOptions);
 
   CompletableFuture<?> subscribe(String subscriberId, Map<String, Set<String>> aggregatesAndEvents, SubscriberOptions subscriberOptions, Function<DispatchedEvent<Event>, CompletableFuture<?>> dispatch);
+
+  /**
+   * Sets an optional event encryptor
+   *
+   * @param eventEncryptor implementation of the event encryptor
+   */
+  void setEventEncryptor(Optional<EventEncryptor> eventEncryptor);
 
   /**
    * Possibly generate a snapshot

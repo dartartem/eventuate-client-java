@@ -1,11 +1,11 @@
 package io.eventuate.encryption;
 
-public class EncryptionKey {
+public class EventEncryptionKey {
   private String id;
   private String key;
   private String salt;
 
-  public EncryptionKey(String id, String key, String salt) {
+  public EventEncryptionKey(String id, String key, String salt) {
     this.id = id;
     this.key = key;
     this.salt = salt;

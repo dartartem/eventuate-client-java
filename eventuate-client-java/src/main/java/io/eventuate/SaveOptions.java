@@ -1,8 +1,6 @@
 package io.eventuate;
 
 
-import io.eventuate.encryption.EncryptionKey;
-
 import java.util.Map;
 import java.util.Optional;
 
@@ -11,7 +9,7 @@ public class SaveOptions {
   private Optional<String> entityId = Optional.empty();
   private Optional<EventContext> triggeringEvent = Optional.empty();
   private Optional<Map<String, String>> eventMetadata = Optional.empty();
-  private Optional<EncryptionKey> encryptionKey = Optional.empty();
+  private Optional<String> encryptionKeyId = Optional.empty();
 
   public Optional<String> getEntityId() {
     return entityId;
@@ -25,8 +23,8 @@ public class SaveOptions {
     return eventMetadata;
   }
 
-  public Optional<EncryptionKey> getEncryptionKey() {
-    return encryptionKey;
+  public Optional<String> getEncryptionKeyId() {
+    return encryptionKeyId;
   }
 
   public SaveOptions withId(String entityId) {
@@ -49,8 +47,8 @@ public class SaveOptions {
     return this;
   }
 
-  public SaveOptions withEncryptionKey(EncryptionKey encryptionKey) {
-    this.encryptionKey = Optional.of(encryptionKey);
+  public SaveOptions withEncryptionKeyId(String eventEncryptionKeyId) {
+    this.encryptionKeyId = Optional.of(eventEncryptionKeyId);
     return this;
   }
 }

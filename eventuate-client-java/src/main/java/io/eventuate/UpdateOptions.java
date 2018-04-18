@@ -1,6 +1,6 @@
 package io.eventuate;
 
-import io.eventuate.encryption.EncryptionKey;
+import io.eventuate.encryption.EventEncryptionKey;
 import org.apache.commons.lang.builder.EqualsBuilder;
 import org.apache.commons.lang.builder.HashCodeBuilder;
 import org.apache.commons.lang.builder.ToStringBuilder;
@@ -14,14 +14,14 @@ public class UpdateOptions {
   private final Optional<Map<String, String>> eventMetadata;
   private final Optional<Snapshot> snapshot;
   private final Optional<AggregateRepositoryInterceptor> interceptor;
-  private final Optional<EncryptionKey> encryptionKey;
+  private final Optional<String> encryptionKeyId;
 
   public UpdateOptions() {
     this.triggeringEvent = Optional.empty();
     this.eventMetadata = Optional.empty();
     this.snapshot = Optional.empty();
     this.interceptor = Optional.empty();
-    this.encryptionKey = Optional.empty();
+    this.encryptionKeyId = Optional.empty();
   }
 
   public UpdateOptions(Optional<EventContext> triggeringEvent,
@@ -36,13 +36,13 @@ public class UpdateOptions {
                        Optional<Map<String, String>> eventMetadata,
                        Optional<Snapshot> snapshot,
                        Optional<AggregateRepositoryInterceptor> interceptor,
-                       Optional<EncryptionKey> encryptionKey) {
+                       Optional<String> encryptionKeyId) {
 
     this.triggeringEvent = triggeringEvent;
     this.eventMetadata = eventMetadata;
     this.snapshot = snapshot;
     this.interceptor = interceptor;
-    this.encryptionKey = encryptionKey;
+    this.encryptionKeyId = encryptionKeyId;
   }
 
   @Override
@@ -72,16 +72,16 @@ public class UpdateOptions {
     return snapshot;
   }
 
-  public Optional<EncryptionKey> getEncryptionKey() {
-    return encryptionKey;
+  public Optional<String> getEncryptionKeyId() {
+    return encryptionKeyId;
   }
 
   public UpdateOptions withTriggeringEvent(EventContext eventContext) {
     return new UpdateOptions(Optional.ofNullable(eventContext), this.eventMetadata, this.snapshot, this.interceptor);
   }
 
-  public UpdateOptions withEncryptionKey(EncryptionKey encryptionKey) {
-    return new UpdateOptions(this.triggeringEvent, this.eventMetadata, this.snapshot, this.interceptor, Optional.of(encryptionKey));
+  public UpdateOptions withEncryptionKeyId(String eventEncryptionKeyId) {
+    return new UpdateOptions(this.triggeringEvent, this.eventMetadata, this.snapshot, this.interceptor, Optional.of(eventEncryptionKeyId));
   }
 
   public UpdateOptions withEventMetadata(Map<String, String> eventMetadata) {

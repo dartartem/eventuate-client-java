@@ -2,8 +2,8 @@ package io.eventuate.javaclient.commonimpl;
 
 import io.eventuate.*;
 import io.eventuate.encryption.EncryptedEventData;
-import io.eventuate.encryption.EventDataEncryptor;
-import io.eventuate.encryption.NoEncryptionKeyProvidedException;
+import io.eventuate.encryption.EventEncryptor;
+import io.eventuate.encryption.NoEventEncryptorProvidedException;
 import io.eventuate.javaclient.commonimpl.schemametadata.EmptyEventSchemaMetadataManager;
 import io.eventuate.javaclient.commonimpl.schemametadata.EventSchemaMetadataManager;
 
@@ -29,13 +29,17 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
   private SerializedEventDeserializer serializedEventDeserializer = new DefaultSerializedEventDeserializer();
   private MissingApplyEventMethodStrategy missingApplyEventMethodStrategy;
   private EventSchemaMetadataManager eventSchemaMetadataManager = new EmptyEventSchemaMetadataManager();
-  private EventDataEncryptor eventDataEncryptor = new EventDataEncryptor();
+  private Optional<EventEncryptor> eventEncryptor = Optional.empty();
 
   public EventuateAggregateStoreImpl(AggregateCrud aggregateCrud, AggregateEvents aggregateEvents, SnapshotManager snapshotManager, MissingApplyEventMethodStrategy missingApplyEventMethodStrategy) {
     this.aggregateCrud = aggregateCrud;
     this.aggregateEvents = aggregateEvents;
     this.snapshotManager = snapshotManager;
     this.missingApplyEventMethodStrategy = missingApplyEventMethodStrategy;
+  }
+
+  public void setEventEncryptor(Optional<EventEncryptor> eventEncryptor) {
+    this.eventEncryptor = eventEncryptor;
   }
 
   public void setSerializedEventDeserializer(SerializedEventDeserializer serializedEventDeserializer) {
@@ -55,16 +59,20 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
   @Override
   public <T extends Aggregate<T>> CompletableFuture<EntityIdAndVersion> save(Class<T> clasz, List<Event> events, Optional<SaveOptions> saveOptions) {
     Optional<String> serializedMetadata = saveOptions.flatMap(so -> withSchemaMetadata(clasz, so.getEventMetadata())).map(JSonMapper::toJson);
+
     List<EventTypeAndData> serializedEvents = events
             .stream()
             .map(event ->
                     toEventTypeAndData(event,
                             serializedMetadata,
-                            json -> saveOptions
-                                    .flatMap(SaveOptions::getEncryptionKey)
-                                    .map(k -> new EncryptedEventData(k.getId(), eventDataEncryptor.encrypt(k, json)).asString())
+                            json -> eventEncryptor
+                                    .map(encryptor -> saveOptions
+                                            .flatMap(SaveOptions::getEncryptionKeyId)
+                                            .map(keyId -> new EncryptedEventData(keyId, encryptor.encrypt(keyId, json)).asString())
+                                            .orElse(json))
                                     .orElse(json)))
             .collect(Collectors.toList());
+
     CompletableFuture<EntityIdVersionAndEventIds> outcome = aggregateCrud.save(clasz.getName(), serializedEvents, AggregateCrudMapping.toAggregateCrudSaveOptions(saveOptions));
     if (activityLogger.isDebugEnabled())
       return CompletableFutureUtil.tap(outcome, (result, throwable) -> {
@@ -123,17 +131,16 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
               .upcastEvents(clasz, le.getEvents())
               .stream()
               .map(event ->
-                      AggregateCrudMapping.toEventWithMetadata(event, json -> findOptions
-                              .flatMap(FindOptions::getEncryptionKey)
-                              .map(k -> EncryptedEventData.isEventDataStringEncrypted(json) ?
-                                      eventDataEncryptor.decrypt(k, EncryptedEventData.fromEventDataString(json).getData()) :
-                                      json)
-                              .orElseGet(() -> {
-                                if (EncryptedEventData.isEventDataStringEncrypted(json)) {
-                                  throw new NoEncryptionKeyProvidedException(EncryptedEventData.fromEventDataString(json));
-                                }
-                                return json;
-                              })))
+                      AggregateCrudMapping.toEventWithMetadata(event, json -> {
+                        if (EncryptedEventData.isEventDataStringEncrypted(json)) {
+                          EncryptedEventData encryptedEventData = EncryptedEventData.fromEventDataString(json);
+                          return eventEncryptor
+                                  .map(e -> e.decrypt(encryptedEventData.getEncryptionKeyId(), encryptedEventData.getData()))
+                                  .orElseThrow(() -> new NoEventEncryptorProvidedException(encryptedEventData));
+                        } else {
+                          return json;
+                        }
+                      }))
               .collect(Collectors.toList());
 
       List<Event> events = eventsWithIds.stream().map(EventWithMetadata::getEvent).collect(Collectors.toList());
@@ -164,14 +171,17 @@ public class EventuateAggregateStoreImpl implements EventuateAggregateStore {
   @Override
   public <T extends Aggregate<T>> CompletableFuture<EntityIdAndVersion> update(Class<T> clasz, EntityIdAndVersion entityIdAndVersion, List<Event> events, Optional<UpdateOptions> updateOptions) {
     Optional<String> serializedMetadata = updateOptions.flatMap(UpdateOptions::getEventMetadata).map(JSonMapper::toJson);
+
     List<EventTypeAndData> serializedEvents = events
             .stream()
             .map(event ->
                     toEventTypeAndData(event,
                             serializedMetadata,
-                            json -> updateOptions
-                                    .flatMap(UpdateOptions::getEncryptionKey)
-                                    .map(k -> new EncryptedEventData(k.getId(), eventDataEncryptor.encrypt(k, json)).asString())
+                            json -> eventEncryptor
+                                    .map(encryptor -> updateOptions
+                                            .flatMap(UpdateOptions::getEncryptionKeyId)
+                                            .map(keyId -> new EncryptedEventData(keyId, encryptor.encrypt(keyId, json)).asString())
+                                            .orElse(json))
                                     .orElse(json)))
             .collect(Collectors.toList());
 
